@@ -9,6 +9,12 @@ import numpy as np
 import colorsys
 
 
+def debug_frame(frame, channel, context):
+    if context['debug']:
+        if frame.shape != (context['height'], context['width'], 3):
+            frame = cv2.resize(frame, (context['width'], context['height']), interpolation=cv2.INTER_CUBIC)
+        context[channel].write(frame)
+
 def ghetto_affine(img, context):
     if context['no_affine']:
         return img
@@ -37,8 +43,7 @@ def ghetto_affine(img, context):
 
     transform = cv2.getPerspectiveTransform(source_points, target_points)
     demo = cv2.warpPerspective(img, transform, (int(width), int(height)))
-    if context['debug']:
-        out_a.write(demo)
+    debug_frame(demo, 'out_a', context)
 
     return demo
 
@@ -85,8 +90,7 @@ def ghetto_masks(img, context):
 
         cv2.rectangle(img, tl_, br_, color=val_m, thickness=-1)
 
-    if context['debug']:
-        out_m.write(cv2.resize(img, (context['width'], context['height']), interpolation=cv2.INTER_CUBIC))
+    debug_frame(img, 'out_m', context)
 
     return img
 
@@ -98,6 +102,7 @@ def ghetto_crop(img, context):
     removed = img[~(np.average(img, axis=1) <= [20, 20, 20]).all(axis=1)]
     if context['debug']:
         print(removed.shape)
+        debug_frame(removed, 'out_b', context)
     return removed
 
 
@@ -106,8 +111,9 @@ def ghetto_crop(img, context):
 @click.option('--no-affine/--affine', default=False)
 @click.option('--no-crop/--crop', default=False)
 @click.option('--debug/--no-debug', default=False)
+@click.option('--log-time/--no-log-time', default=False)
 @click.option('--config', type=click.Path())
-def main(test_file, no_affine, no_crop, debug, config):
+def main(test_file, no_affine, no_crop, debug, log_time, config):
     with open(config) as fp:
         factors = json.load(fp)
 
@@ -117,6 +123,7 @@ def main(test_file, no_affine, no_crop, debug, config):
             'debug': debug,
             'no_affine': no_affine,
             'no_crop': no_crop,
+            'log_time': log_time,
         }
     }
 
@@ -144,8 +151,8 @@ def main(test_file, no_affine, no_crop, debug, config):
         context['height_float'] = 1080.0
     else:
         cam = cv2.VideoCapture(0)   # 0 -> index of camera
-        cam.set(3, 1920)
-        cam.set(4, 1080)
+        cam.set(3, context['camera']['w'])
+        cam.set(4, context['camera']['h'])
         cam.set(cv2.CAP_PROP_AUTOFOCUS, 0)
 
         context['width'] = int(cam.get(3))
@@ -160,15 +167,15 @@ def main(test_file, no_affine, no_crop, debug, config):
         print(context['height'])
         print(fourcc)
 
-        out_o = cv2.VideoWriter('/tmp1/cam-test-orig.avi', fourcc, 30, (context['width'], context['height']))
-        out_a = cv2.VideoWriter('/tmp1/cam-test-affine.avi', fourcc, 30, (context['width'], context['height']))
-        out_m = cv2.VideoWriter('/tmp1/cam-test-masked.avi', fourcc, 30, (context['width'], context['height']))
-        out_b = cv2.VideoWriter('/tmp1/cam-test-bars.avi', fourcc, 30, (context['width'], context['height']))
-        out_g = cv2.VideoWriter('/tmp1/cam-test-grey.avi', fourcc, 30, (context['width'], context['height']))
-        out_t = cv2.VideoWriter('/tmp1/cam-test-thresh.avi', fourcc, 30, (context['width'], context['height']))
-        out_c = cv2.VideoWriter('/tmp1/cam-test-countour.avi', fourcc, 30, (context['width'], context['height']))
-        out_co = cv2.VideoWriter('/tmp1/cam-test-countour-overlay.avi', fourcc, 30, (context['width'], context['height']))
-        out = cv2.VideoWriter('/tmp1/cam-test.avi', fourcc, 30, (context['width'], context['height']))
+        context['out_o'] = cv2.VideoWriter('/tmp1/cam-test-orig.avi', fourcc, 30, (context['width'], context['height']))
+        context['out_a'] = cv2.VideoWriter('/tmp1/cam-test-affine.avi', fourcc, 30, (context['width'], context['height']))
+        context['out_m'] = cv2.VideoWriter('/tmp1/cam-test-masked.avi', fourcc, 30, (context['width'], context['height']))
+        context['out_b'] = cv2.VideoWriter('/tmp1/cam-test-bars.avi', fourcc, 30, (context['width'], context['height']))
+        context['out_g'] = cv2.VideoWriter('/tmp1/cam-test-grey.avi', fourcc, 30, (context['width'], context['height']))
+        context['out_t'] = cv2.VideoWriter('/tmp1/cam-test-thresh.avi', fourcc, 30, (context['width'], context['height']))
+        context['out_c'] = cv2.VideoWriter('/tmp1/cam-test-countour.avi', fourcc, 30, (context['width'], context['height']))
+        context['out_co'] = cv2.VideoWriter('/tmp1/cam-test-countour-overlay.avi', fourcc, 30, (context['width'], context['height']))
+        context['out'] = cv2.VideoWriter('/tmp1/cam-test.avi', fourcc, 30, (context['width'], context['height']))
 
     lan = lifxlan.LifxLAN(26)
     bias = lan.get_device_by_name('TV Bias')
@@ -178,6 +185,8 @@ def main(test_file, no_affine, no_crop, debug, config):
         print(bias)
 
     while True:
+        start_time = time.time()
+
         read, img = cam.read()
 
         if not read:
@@ -185,7 +194,7 @@ def main(test_file, no_affine, no_crop, debug, config):
 
         if context['debug']:
             cv2.imwrite("/tmp1/cam-test.png", img)
-            out_o.write(img)
+            debug_frame(img, 'out_o', context)
 
         demo = ghetto_affine(img, context)
 
@@ -193,9 +202,14 @@ def main(test_file, no_affine, no_crop, debug, config):
 
         removed = ghetto_masks(removed, context)
 
-        shrink = cv2.resize(removed, (context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
+        # shrink = cv2.resize(removed, (context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
+        # shrink = cv2.resize(removed.row(0), (context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
+        shrink = removed[5, 10::(context['width']//context['num_zones'] + 1)]
+        if context['debug']:
+            print(shrink)
+            print(shrink.shape)
 
-        hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink[0].tolist()]
+        hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
 
         lifx_hsv = [[h*257*255, s*257*255, v*257*255, 3500] for [h, s, v] in hsv]
 
@@ -204,28 +218,30 @@ def main(test_file, no_affine, no_crop, debug, config):
 
         try:
             bias.set_zone_colors(lifx_hsv, duration=500)
-        except:
-            pass
+        except Exception as e:
+            print(e)
 
         if context['debug']:
-            final = cv2.cvtColor(cv2.resize(shrink, (context['width'], context['height']), interpolation=cv2.INTER_NEAREST), cv2.COLOR_HSV2BGR)
-            out.write(final)
+            final = cv2.resize(np.expand_dims(shrink, axis=0), (context['width'], context['height']), interpolation=cv2.INTER_NEAREST)
+            debug_frame(final, 'out', context)
 
+        if context['log_time']:
+            print(time.time() - start_time)
         if stop['stop']:
             break
 
     cam.release()
 
     if context['debug']:
-        out.release()
-        out_o.release()
-        out_a.release()
-        out_m.release()
-        out_b.release()
-        out_g.release()
-        out_t.release()
-        out_c.release()
-        out_co.release()
+        context['out'].release()
+        context['out_o'].release()
+        context['out_a'].release()
+        context['out_m'].release()
+        context['out_b'].release()
+        context['out_g'].release()
+        context['out_t'].release()
+        context['out_c'].release()
+        context['out_co'].release()
 
 
 if __name__ == '__main__':
