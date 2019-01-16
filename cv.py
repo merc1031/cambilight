@@ -9,6 +9,13 @@ import numpy as np
 import colorsys
 
 
+def timed(t, fn, *args, **kwargs):
+    start_time = time.time()
+    v = fn(*args, **kwargs)
+    print(t, time.time() - start_time)
+    return v
+
+
 def debug_frame(frame, channel, context):
     if context['debug']:
         if frame.shape != (context['height'], context['width'], 3):
@@ -76,9 +83,10 @@ def ghetto_masks(img, context):
             tl_ = (0, 0)
             br_ = (first + reg_width, reg_height)
 
-        for i in range(reg_width):
-            for j in range(reg_height):
-                mask[j][first + (reg_width * k + i)] = 1
+        mask[0:reg_height, first + (reg_width * k): first + (reg_width * k + reg_height)] = 1
+        # for i in range(reg_width):
+        #     for j in range(reg_height):
+        #         mask[j][first + (reg_width * k + i)] = 1
 
         if k == num_zones - 1:
             for i in range(last):
@@ -185,50 +193,55 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
         print(bias)
 
     while True:
-        start_time = time.time()
-
-        read, img = cam.read()
-
-        if not read:
-            break
-
-        if context['debug']:
-            cv2.imwrite("/tmp1/cam-test.png", img)
-            debug_frame(img, 'out_o', context)
-
-        demo = ghetto_affine(img, context)
-
-        removed = ghetto_crop(demo, context)
-
-        removed = ghetto_masks(removed, context)
-
-        # shrink = cv2.resize(removed, (context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
-        # shrink = cv2.resize(removed.row(0), (context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
-        shrink = removed[5, 10::(context['width']//context['num_zones'] + 1)]
-        if context['debug']:
-            print(shrink)
-            print(shrink.shape)
-
-        hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
-
-        lifx_hsv = [[h*257*255, s*257*255, v*257*255, 3500] for [h, s, v] in hsv]
-
-        if context['debug']:
-            print(lifx_hsv)
-
         try:
-            bias.set_zone_colors(lifx_hsv, duration=500)
+            start_time = time.time()
+
+            read, img = cam.read()
+
+            if not read:
+                break
+
+            if context['debug']:
+                cv2.imwrite("/tmp1/cam-test.png", img)
+                debug_frame(img, 'out_o', context)
+
+            demo = timed('ghetto_affine', ghetto_affine, img, context)
+
+            removed = timed('ghetto_crop', ghetto_crop, demo, context)
+
+            removed = timed('ghetto_masks', ghetto_masks, removed, context)
+
+            # shrink = cv2.resize(removed, (context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
+            # shrink = cv2.resize(removed.row(0), (context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
+            shrink = removed[5, 10::(context['width']//context['num_zones'] + 1)]
+            if context['debug']:
+                print(shrink)
+                print(shrink.shape)
+
+            hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
+
+            lifx_hsv = [[h*257*255, s*257*255, v*257*255, 3500] for [h, s, v] in hsv]
+
+            if context['debug']:
+                print(lifx_hsv)
+
+            try:
+                timed('set_zone_colors', bias.set_zone_colors, lifx_hsv, duration=200, rapid=True)
+            except Exception as e:
+                print(e)
+
+            if context['debug']:
+                final = cv2.resize(np.expand_dims(shrink, axis=0), (context['width'], context['height']), interpolation=cv2.INTER_NEAREST)
+                debug_frame(final, 'out', context)
+
+            if context['log_time']:
+                print(time.time() - start_time)
         except Exception as e:
             print(e)
 
-        if context['debug']:
-            final = cv2.resize(np.expand_dims(shrink, axis=0), (context['width'], context['height']), interpolation=cv2.INTER_NEAREST)
-            debug_frame(final, 'out', context)
-
-        if context['log_time']:
-            print(time.time() - start_time)
         if stop['stop']:
             break
+        time.sleep(.1)
 
     cam.release()
 
