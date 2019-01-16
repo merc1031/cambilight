@@ -1,0 +1,20 @@
+{
+    "top_left_factor": {
+        "w" : 0.29125,
+        "h" : 0.13889
+    },
+    "top_right_factor": {
+        "w" : 0.66667,
+        "h" : 0.13889
+    },
+    "bottom_left_factor": {
+        "w" : 0.31100,
+        "h" : 0.50926
+    },
+    "bottom_right_factor": {
+        "w" : 0.65104,
+        "h" : 0.50000
+    },
+    "num_zones": 50,
+    "max_band_size": 0.115
+}
