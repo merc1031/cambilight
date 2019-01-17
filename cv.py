@@ -107,7 +107,11 @@ def ghetto_crop(img, context):
     if context['no_crop']:
         return img
 
-    removed = img[~(np.average(img, axis=1) <= [20, 20, 20]).all(axis=1)]
+    no_subs_l = int(.20 * context['width'])
+    no_subs_r = int(.80 * context['width'])
+    mask = np.zeros(context['width'], np.uint8)
+    mask[np.r_[0:no_subs_l, no_subs_r:context['width']]] = 1
+    removed = img[~(np.average(img, weights=mask, axis=1) <= [20, 20, 20]).all(axis=1)]
     if context['debug']:
         print(removed.shape)
         debug_frame(removed, 'out_b', context)
