@@ -230,7 +230,7 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
                 print(lifx_hsv)
 
             try:
-                timed('set_zone_colors', bias.set_zone_colors, lifx_hsv, duration=200, rapid=True)
+                timed('set_zone_colors', bias.set_zone_colors, lifx_hsv, rapid=True)
             except Exception as e:
                 print(e)
 
