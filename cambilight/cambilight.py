@@ -7,7 +7,6 @@ import click
 import cv2
 import lifxlan
 import numpy as np
-import colorsys
 
 
 def timed(t, fn, *args, **kwargs):
@@ -24,6 +23,7 @@ def debug_frame(frame, channel, context):
         frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
         context[channel].write(frame)
 
+
 def ghetto_affine(img, context):
     if context['no_affine']:
         return img
@@ -35,17 +35,17 @@ def ghetto_affine(img, context):
     bl_factor = context['bottom_left_factor']
     br_factor = context['bottom_right_factor']
 
-    tl = [int(width * context['top_left_factor']['w']),     int(height * context['top_left_factor']['h'])]
-    tr = [int(width * context['top_right_factor']['w']),    int(height * context['top_right_factor']['h'])]
-    bl = [int(width * context['bottom_left_factor']['w']),  int(height * context['bottom_left_factor']['h'])]
-    br = [int(width * context['bottom_right_factor']['w']), int(height * context['bottom_right_factor']['h'])]
+    tl = [int(width * tl_factor['w']),     int(height * tl_factor['h'])]
+    tr = [int(width * tr_factor['w']),    int(height * tr_factor['h'])]
+    bl = [int(width * bl_factor['w']),  int(height * bl_factor['h'])]
+    br = [int(width * br_factor['w']), int(height * br_factor['h'])]
 
     source_points = np.array([tl, tr, bl, br], dtype=np.float32)
     target_points = np.array(
         [
             [0, 0],
             [int(width - 1), 0],
-            [0, int(height -1)],
+            [0, int(height - 1)],
             [int(width - 1), int(height - 1)]
         ],
         dtype=np.float32)
@@ -60,7 +60,6 @@ def ghetto_affine(img, context):
 def ghetto_masks(img, context):
     num_zones = context['num_zones']
     max_band_size = context['max_band_size']
-
 
     reg_height = int(context['height'] * (2 * max_band_size))
     reg_width = int(context['width'] / num_zones)
@@ -121,7 +120,6 @@ def ghetto_crop(img, context):
     average_row = np.average(img, axis=1)
     dev_row = np.std(img, axis=1)
 
-    #hsv = np.array([colorsys.rgb_to_hsv(r, g, b) for [b, g, r] in average_row.tolist()])
     print("Average", average_row)
     print("Average high", average_row[0])
     print("Average mid", average_row[240])
@@ -176,6 +174,7 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
         class IM:
             def read(self):
                 return True, cv2.imread(test_file)
+
             def release(self):
                 pass
 
@@ -204,10 +203,30 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
         print(fourcc)
 
         context['out_o'] = cv2.VideoWriter('/tmp1/cam-test-orig.avi', fourcc, 30, (context['width'], context['height']))
-        context['out_a'] = cv2.VideoWriter('/tmp1/cam-test-affine.avi', fourcc, 30, (context['width'], context['height']))
-        context['out_m'] = cv2.VideoWriter('/tmp1/cam-test-masked.avi', fourcc, 30, (context['width'], context['height']))
-        context['out_b'] = cv2.VideoWriter('/tmp1/cam-test-bars.avi', fourcc, 30, (context['width'], context['height']))
-        context['out'] = cv2.VideoWriter('/tmp1/cam-test.avi', fourcc, 30, (context['width'], context['height']))
+        context['out_a'] = cv2.VideoWriter(
+            '/tmp1/cam-test-affine.avi',
+            fourcc,
+            30,
+            (context['width'], context['height'])
+        )
+        context['out_m'] = cv2.VideoWriter(
+            '/tmp1/cam-test-masked.avi',
+            fourcc,
+            30,
+            (context['width'], context['height'])
+        )
+        context['out_b'] = cv2.VideoWriter(
+            '/tmp1/cam-test-bars.avi',
+            fourcc,
+            30,
+            (context['width'], context['height'])
+        )
+        context['out'] = cv2.VideoWriter(
+            '/tmp1/cam-test.avi',
+            fourcc,
+            30,
+            (context['width'], context['height'])
+        )
 
     lan = lifxlan.LifxLAN(26)
     bias = lan.get_device_by_name('TV Bias')
@@ -238,14 +257,14 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
 
             # shrink = cv2.resize(removed, (context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
             # shrink = cv2.resize(removed.row(0), (context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
-            shrink = removed[5, 10::(context['width']//context['num_zones'] + 1)]
+            shrink = removed[5, 10::(context['width'] // context['num_zones'] + 1)]
             if context['debug']:
                 print(shrink)
                 print(shrink.shape)
 
-            #hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
+            # hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
 
-            lifx_hsv = [[h*257, s*257, v*257, 3500] for [h, s, v] in shrink.tolist()]
+            lifx_hsv = [[h * 257, s * 257, v * 257, 3500] for [h, s, v] in shrink.tolist()]
 
             if context['debug']:
                 print(lifx_hsv)
@@ -257,7 +276,11 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
                 traceback.print_exc()
 
             if context['debug']:
-                final = cv2.resize(np.expand_dims(shrink, axis=0), (context['width'], context['height']), interpolation=cv2.INTER_NEAREST)
+                final = cv2.resize(
+                    np.expand_dims(shrink, axis=0),
+                    (context['width'], context['height']),
+                    interpolation=cv2.INTER_NEAREST
+                )
                 debug_frame(final, 'out', context)
 
             if context['log_time']:
@@ -278,7 +301,3 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
         context['out_a'].release()
         context['out_m'].release()
         context['out_b'].release()
-
-
-if __name__ == '__main__':
-    main()
