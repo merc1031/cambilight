@@ -1,6 +1,7 @@
 import json
 import time
 import signal
+import traceback
 
 import click
 import cv2
@@ -20,6 +21,7 @@ def debug_frame(frame, channel, context):
     if context['debug']:
         if frame.shape != (context['height'], context['width'], 3):
             frame = cv2.resize(frame, (context['width'], context['height']), interpolation=cv2.INTER_CUBIC)
+        frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
         context[channel].write(frame)
 
 def ghetto_affine(img, context):
@@ -109,9 +111,31 @@ def ghetto_crop(img, context):
 
     no_subs_l = int(.20 * context['width'])
     no_subs_r = int(.80 * context['width'])
+
     mask = np.zeros(context['width'], np.uint8)
     mask[np.r_[0:no_subs_l, no_subs_r:context['width']]] = 1
-    removed = img[~(np.average(img, weights=mask, axis=1) <= [20, 20, 20]).all(axis=1)]
+
+    start_of_safe = int(context['height'] * context['max_band_size'])
+    end_of_safe = (int((1 - context['max_band_size']) * context['height']))
+
+    average_row = np.average(img, axis=1)
+    dev_row = np.std(img, axis=1)
+
+    #hsv = np.array([colorsys.rgb_to_hsv(r, g, b) for [b, g, r] in average_row.tolist()])
+    print("Average", average_row)
+    print("Average high", average_row[0])
+    print("Average mid", average_row[240])
+    print("Average low", average_row[470])
+
+    print("Dev", dev_row)
+    print("Dev high", dev_row[0])
+    print("Dev mid", dev_row[240])
+    print("Dev low", dev_row[470])
+
+    blackish_rows = (~(np.average(img, weights=mask, axis=1)[2] <= [20, 20, 20]).all(axis=1))
+
+    blackish_rows[start_of_safe:end_of_safe] = True
+    removed = img[blackish_rows]
     if context['debug']:
         print(removed.shape)
         debug_frame(removed, 'out_b', context)
@@ -183,10 +207,6 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
         context['out_a'] = cv2.VideoWriter('/tmp1/cam-test-affine.avi', fourcc, 30, (context['width'], context['height']))
         context['out_m'] = cv2.VideoWriter('/tmp1/cam-test-masked.avi', fourcc, 30, (context['width'], context['height']))
         context['out_b'] = cv2.VideoWriter('/tmp1/cam-test-bars.avi', fourcc, 30, (context['width'], context['height']))
-        context['out_g'] = cv2.VideoWriter('/tmp1/cam-test-grey.avi', fourcc, 30, (context['width'], context['height']))
-        context['out_t'] = cv2.VideoWriter('/tmp1/cam-test-thresh.avi', fourcc, 30, (context['width'], context['height']))
-        context['out_c'] = cv2.VideoWriter('/tmp1/cam-test-countour.avi', fourcc, 30, (context['width'], context['height']))
-        context['out_co'] = cv2.VideoWriter('/tmp1/cam-test-countour-overlay.avi', fourcc, 30, (context['width'], context['height']))
         context['out'] = cv2.VideoWriter('/tmp1/cam-test.avi', fourcc, 30, (context['width'], context['height']))
 
     lan = lifxlan.LifxLAN(26)
@@ -201,6 +221,7 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
             start_time = time.time()
 
             read, img = cam.read()
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
             if not read:
                 break
@@ -222,9 +243,9 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
                 print(shrink)
                 print(shrink.shape)
 
-            hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
+            #hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
 
-            lifx_hsv = [[h*257*255, s*257*255, v*257*255, 3500] for [h, s, v] in hsv]
+            lifx_hsv = [[h*257, s*257, v*257, 3500] for [h, s, v] in shrink.tolist()]
 
             if context['debug']:
                 print(lifx_hsv)
@@ -233,6 +254,7 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
                 timed('set_zone_colors', bias.set_zone_colors, lifx_hsv, rapid=True)
             except Exception as e:
                 print(e)
+                traceback.print_exc()
 
             if context['debug']:
                 final = cv2.resize(np.expand_dims(shrink, axis=0), (context['width'], context['height']), interpolation=cv2.INTER_NEAREST)
@@ -242,6 +264,7 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
                 print(time.time() - start_time)
         except Exception as e:
             print(e)
+            traceback.print_exc()
 
         if stop['stop']:
             break
@@ -255,10 +278,6 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
         context['out_a'].release()
         context['out_m'].release()
         context['out_b'].release()
-        context['out_g'].release()
-        context['out_t'].release()
-        context['out_c'].release()
-        context['out_co'].release()
 
 
 if __name__ == '__main__':
