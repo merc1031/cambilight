@@ -291,9 +291,17 @@ class Cambilight:
 
                 removed = timed('ghetto_masks', ghetto_masks, removed, context=self.context)
 
-                # shrink = cv2.resize(removed, (self.context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
-                # shrink = cv2.resize(removed.row(0), (self.context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
-                shrink = removed[5, 10::(self.context['width'] // self.context['num_zones'] + 1)]
+                gap = round(((self.context['width'] / self.context['num_zones'] - self.context['width'] // self.context['num_zones']) *  self.context['num_zones']))
+                criteria = np.r_[
+                    gap // 2,
+                    (gap // 2) + (self.context['width'] // self.context['num_zones'])\
+                    :\
+                    self.context['width']-((gap // 2) + (self.context['width'] // self.context['num_zones']))\
+                    :\
+                    self.context['width'] // self.context['num_zones'],
+                    self.context['width'] - (gap // 2)
+                ]
+                shrink = removed[5, criteria]
                 if self.context['debug']:
                     print(shrink)
                     print(shrink.shape)
@@ -325,7 +333,6 @@ class Cambilight:
                 print(e)
                 traceback.print_exc()
 
-            time.sleep(.1)
             if self.stop:
                 break
 

@@ -96,7 +96,7 @@ def describe_Cambilight():
         mock_lifxlan.return_value.get_device_by_name.assert_called_once_with('TV Bias')
         mock_lifxlan.return_value.get_device_by_name.return_value.set_power.assert_called_once_with(True)
         mock_camera.return_value.read.assert_called_once_with()
-        mock_sleep.assert_called_once_with(.1)
+        # mock_sleep.assert_called_once_with(.1)
         mock_camera.return_value.release.assert_called_once_with()
 
     def describe_remove_bars():
