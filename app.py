@@ -1,5 +1,5 @@
-import cambilight
+import cambilight.cambilight
 
 
 if __name__ == '__main__':
-    cambilight.main()
+    cambilight.cambilight.main()
