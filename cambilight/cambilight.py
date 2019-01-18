@@ -9,6 +9,11 @@ import lifxlan
 import numpy as np
 
 
+def print_d(context, *args, **kwargs):
+    if context['debug']:
+        print(*args, **kwargs)
+
+
 def debug_frame(frame, channel, context, unformatted_path=None):
     if context['debug']:
         if frame.shape != (context['height'], context['width'], 3):
@@ -218,6 +223,7 @@ class Cambilight:
             self.context['height_float'] = 1080.0
         else:
             cam = cv2.VideoCapture(0)   # 0 -> index of camera
+            print_d(self.context, 'asking camera to set', self.context['camera'])
             cam.set(3, self.context['camera']['w'])
             cam.set(4, self.context['camera']['h'])
             cam.set(cv2.CAP_PROP_AUTOFOCUS, 0)
@@ -226,13 +232,13 @@ class Cambilight:
             self.context['height'] = int(cam.get(4))
             self.context['width_float'] = cam.get(3)
             self.context['height_float'] = cam.get(4)
+            print_d(self.context, 'camera context', self.context['width'])
+            print_d(self.context, 'camera context', self.context['height'])
 
         fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
 
         if self.context['debug']:
-            print(self.context['width'])
-            print(self.context['height'])
-            print(fourcc)
+            print_d(self.context, 'fourcc', fourcc)
 
             self.context['original'] = cv2.VideoWriter(
                 '/tmp1/cam-test-original.avi',
@@ -269,8 +275,7 @@ class Cambilight:
         bias = lan.get_device_by_name('TV Bias')
         bias.set_power(True)
 
-        if self.context['debug']:
-            print(bias)
+        print_d(self.context, 'bias light', bias)
 
         while True:
             try:
@@ -291,7 +296,19 @@ class Cambilight:
 
                 removed = timed('ghetto_masks', ghetto_masks, removed, context=self.context)
 
-                gap = round(((self.context['width'] / self.context['num_zones'] - self.context['width'] // self.context['num_zones']) *  self.context['num_zones']))
+
+                # This is wrong, adds too much when floating part is large....
+                gap = round(
+                    (
+                        (
+                            (self.context['width'] / self.context['num_zones']) - (self.context['width'] // self.context['num_zones'])
+                        ) *  self.context['num_zones']
+                    )
+                )
+
+                print_d(self.context, 'width', self.context['width'])
+                print_d(self.context, 'zones', self.context['num_zones'])
+                print_d(self.context, 'gap', gap)
                 criteria = np.r_[
                     gap // 2,
                     (gap // 2) + (self.context['width'] // self.context['num_zones'])\
@@ -302,16 +319,14 @@ class Cambilight:
                     self.context['width'] - (gap // 2)
                 ]
                 shrink = removed[5, criteria]
-                if self.context['debug']:
-                    print(shrink)
-                    print(shrink.shape)
+                print_d(self.context, shrink)
+                print_d(self.context, shrink.shape)
 
                 # hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
 
                 lifx_hsv = [[h * 257, s * 257, v * 257, 3500] for [h, s, v] in shrink.tolist()]
 
-                if self.context['debug']:
-                    print(lifx_hsv)
+                print_d(self.context, 'hsv', lifx_hsv)
 
                 try:
                     timed('set_zone_colors', bias.set_zone_colors, lifx_hsv, duration=500, rapid=True)
