@@ -37,7 +37,7 @@ def data(ncols, nrows, mk_pixel, ret):
     cols = range(ncols)
     rows = range(nrows)
     return (ret, np.array(
-        [[mk_pixel(x, y) for y in cols] for x in rows]
+        [[mk_pixel(x, y) for x in cols] for y in rows]
     ))
 
 
@@ -102,16 +102,89 @@ def describe_Cambilight():
     def describe_remove_bars():
         def context_has_black_bars():
             @pytest.fixture
+            def ncols():
+                return 10
+
+            @pytest.fixture
+            def nrows():
+                return 10
+
+            @pytest.fixture
             def mk_pixel(ncols, nrows):
                 def m(x, y):
-                    if y < int(nrows * .20) or y > int(nrows * .80):
+                    if y < int(nrows * .20) or y >= int(nrows * .80):
                         return [0, 0, 0]
                     else:
                         return [255, 255, 255]
                 return m
 
             def remove_bars(basic_config, mock_lifxlan, mock_camera, mock_sleep, data):
-                print(data)
                 res = cambilight.cambilight.ghetto_crop(data[1], basic_config)
+                safe_zone = cambilight.cambilight.safe_zone(basic_config)
+                s, e = (min(2, safe_zone[0]), max(8, safe_zone[1]))
 
-                assert res == data[1]
+                assert res.shape == data[1][s:e].shape
+                assert np.allclose(res, data[1][s:e])
+
+        def context_no_black_bars():
+            def no_remove_bars(basic_config, mock_lifxlan, mock_camera, mock_sleep, data):
+                res = cambilight.cambilight.ghetto_crop(data[1], basic_config)
+                assert res.shape == data[1].shape
+                assert np.allclose(res, data[1])
+
+        def context_has_artifacts():
+            @pytest.fixture
+            def ncols():
+                return 10
+
+            @pytest.fixture
+            def nrows():
+                return 10
+
+            @pytest.fixture
+            def mk_pixel(ncols, nrows):
+                def m(x, y):
+                    if (y < int(nrows * .20) or y >= int(nrows * .80))\
+                        and (x < int(ncols * .25) or x > int(ncols * .75)):
+                        return [0, 0, 0]
+                    else:
+                        return [255, 255, 255]
+                return m
+
+            def remove_bars(basic_config, mock_lifxlan, mock_camera, mock_sleep, data):
+                res = cambilight.cambilight.ghetto_crop(data[1], basic_config)
+                safe_zone = cambilight.cambilight.safe_zone(basic_config)
+                s, e = (min(2, safe_zone[0]), max(8, safe_zone[1]))
+
+                assert res.shape == data[1][s:e].shape
+                assert np.allclose(res, data[1][s:e])
+
+        def context_dark_image_has_artifacts():
+            @pytest.fixture
+            def ncols():
+                return 10
+
+            @pytest.fixture
+            def nrows():
+                return 10
+
+            @pytest.fixture
+            def mk_pixel(ncols, nrows):
+                def m(x, y):
+                    if (y < int(nrows * .20) or y >= int(nrows * .80))\
+                        and (x < int(ncols * .25) or x > int(ncols * .75)):
+                        return [0, 0, 0]
+                    else:
+                        if y == 5:
+                            return [0, 0, 0]
+                        else:
+                            return [255, 255, 255]
+                return m
+
+            def remove_bars(basic_config, mock_lifxlan, mock_camera, mock_sleep, data):
+                res = cambilight.cambilight.ghetto_crop(data[1], basic_config)
+                safe_zone = cambilight.cambilight.safe_zone(basic_config)
+                s, e = (min(2, safe_zone[0]), max(8, safe_zone[1]))
+
+                assert res.shape == data[1][s:e].shape
+                assert np.allclose(res, data[1][s:e])

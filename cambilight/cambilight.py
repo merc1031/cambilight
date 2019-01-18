@@ -135,16 +135,35 @@ def ghetto_crop(img, context):
     # blackish_rows[start_of_safe:end_of_safe] = True
     # removed = img[blackish_rows]
 
+    # Only check outside to avoid subtitles
     no_subs_l = int(.20 * context['width'])
     no_subs_r = int(.80 * context['width'])
     mask = np.zeros(context['width'], np.uint8)
     mask[np.r_[0:no_subs_l, no_subs_r:context['width']]] = 1
-    removed = img[~(np.average(img, weights=mask, axis=1) <= [20, 20, 20]).all(axis=1)]
+
+    # Now defend from eliminating dark scenes
+    start_of_safe, end_of_safe = safe_zone(context)
+    safe_mask = np.zeros(context['height'], np.uint8)
+    safe_mask[start_of_safe:end_of_safe] = 1
+
+    criteria = img[:, :, 2]
+
+    removed = img[np.logical_or(
+        ~(np.average(criteria, weights=mask, axis=1) <= 20),
+        safe_mask
+    )
+    ]
 
     if context['debug']:
         print(removed.shape)
         debug_frame(removed, 'out_b', context)
     return removed
+
+
+def safe_zone(context):
+    start_of_safe = int(context['height'] * context['max_band_size'])
+    end_of_safe = int((1 - context['max_band_size']) * context['height'])
+    return (start_of_safe, end_of_safe)
 
 
 @click.command()
