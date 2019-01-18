@@ -11,4 +11,5 @@ pyflakes==2.0.0
 pytest==4.0.2
 pytest-describe==0.11.1
 pytest-mock==1.10.0
+pytest-watch==4.2.0
 six==1.12.0
