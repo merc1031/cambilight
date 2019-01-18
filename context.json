@@ -1,24 +1,24 @@
 {
     "top_left_factor": {
-        "w" : 0.22312,
-        "h" : 0.14500
-    },
-    "top_right_factor": {
-        "w" : 0.71875,
+        "w" : 0.28,
         "h" : 0.14
     },
+    "top_right_factor": {
+        "w" : 0.665,
+        "h" : 0.135
+    },
     "bottom_left_factor": {
-        "w" : 0.234375,
-        "h" : 0.500000
+        "w" : 0.305,
+        "h" : 0.505
     },
     "bottom_right_factor": {
-        "w" : 0.703125,
-        "h" : 0.50000
+        "w" : 0.65,
+        "h" : 0.50
     },
     "num_zones": 50,
     "max_band_size": 0.115,
     "camera": {
-        "w": 640,
-        "h": 480
+        "w": 480,
+        "h": 270
     }
 }

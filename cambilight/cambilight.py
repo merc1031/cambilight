@@ -9,19 +9,23 @@ import lifxlan
 import numpy as np
 
 
+def debug_frame(frame, channel, context, unformatted_path=None):
+    if context['debug']:
+        if frame.shape != (context['height'], context['width'], 3):
+            frame = cv2.resize(frame, (context['width'], context['height']), interpolation=cv2.INTER_LINEAR)
+        frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
+        context[channel].write(frame)
+        if unformatted_path is not None:
+            cv2.imwrite(unformatted_path.format(channel=channel), frame)
+
+
 def timed(t, fn, *args, **kwargs):
     start_time = time.time()
     v = fn(*args, **kwargs)
-    print(t, time.time() - start_time)
+    if kwargs.get('context', {}).get('log_time', False):
+        print(t, time.time() - start_time)
     return v
 
-
-def debug_frame(frame, channel, context):
-    if context['debug']:
-        if frame.shape != (context['height'], context['width'], 3):
-            frame = cv2.resize(frame, (context['width'], context['height']), interpolation=cv2.INTER_CUBIC)
-        frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
-        context[channel].write(frame)
 
 
 def ghetto_affine(img, context):
@@ -51,8 +55,10 @@ def ghetto_affine(img, context):
         dtype=np.float32)
 
     transform = cv2.getPerspectiveTransform(source_points, target_points)
+
     demo = cv2.warpPerspective(img, transform, (int(width), int(height)))
-    debug_frame(demo, 'out_a', context)
+
+    debug_frame(demo, 'affine', context, unformatted_path='/tmp1/cam-test-{channel}.png')
 
     return demo
 
@@ -78,28 +84,19 @@ def ghetto_masks(img, context):
         br_ = (first + (reg_width * (k + 1)), reg_height)
 
         if k == 0:
-            for i in range(first):
-                for j in range(reg_height):
-                    mask[j][i] = 1
+            mask[0:reg_height, 0:first] = 1
             tl_ = (0, 0)
             br_ = (first + reg_width, reg_height)
-
-        mask[0:reg_height, first + (reg_width * k): first + (reg_width * k + reg_height)] = 1
-        # for i in range(reg_width):
-        #     for j in range(reg_height):
-        #         mask[j][first + (reg_width * k + i)] = 1
-
         if k == num_zones - 1:
-            for i in range(last):
-                for j in range(reg_height):
-                    mask[j][first + (reg_width * (k + 1) + i)] = 1
+            mask[0:reg_height, (first + (reg_width * k)):(first + last + (reg_width * (k + 1)))] = 1
             br_ = (first + last + (reg_width * (k + 1)), reg_height)
+        mask[0:reg_height, first + (reg_width * k): first + (reg_width * (k + 1))] = 1
 
         val_m = cv2.mean(img, mask=mask)
 
         cv2.rectangle(img, tl_, br_, color=val_m, thickness=-1)
 
-    debug_frame(img, 'out_m', context)
+    debug_frame(img, 'masked', context, unformatted_path='/tmp1/cam-test-{channel}.png')
 
     return img
 
@@ -156,7 +153,7 @@ def ghetto_crop(img, context):
 
     if context['debug']:
         print(removed.shape)
-        debug_frame(removed, 'out_b', context)
+        debug_frame(removed, 'bars', context, unformatted_path='/tmp1/cam-test-{channel}.png')
     return removed
 
 
@@ -237,32 +234,32 @@ class Cambilight:
             print(self.context['height'])
             print(fourcc)
 
-            self.context['out_o'] = cv2.VideoWriter(
-                '/tmp1/cam-test-orig.avi',
+            self.context['original'] = cv2.VideoWriter(
+                '/tmp1/cam-test-original.avi',
                 fourcc,
                 30,
                 (self.context['width'], self.context['height'])
             )
-            self.context['out_a'] = cv2.VideoWriter(
+            self.context['affine'] = cv2.VideoWriter(
                 '/tmp1/cam-test-affine.avi',
                 fourcc,
                 30,
                 (self.context['width'], self.context['height'])
             )
-            self.context['out_m'] = cv2.VideoWriter(
+            self.context['masked'] = cv2.VideoWriter(
                 '/tmp1/cam-test-masked.avi',
                 fourcc,
                 30,
                 (self.context['width'], self.context['height'])
             )
-            self.context['out_b'] = cv2.VideoWriter(
+            self.context['bars'] = cv2.VideoWriter(
                 '/tmp1/cam-test-bars.avi',
                 fourcc,
                 30,
                 (self.context['width'], self.context['height'])
             )
-            self.context['out'] = cv2.VideoWriter(
-                '/tmp1/cam-test.avi',
+            self.context['final'] = cv2.VideoWriter(
+                '/tmp1/cam-test-final.avi',
                 fourcc,
                 30,
                 (self.context['width'], self.context['height'])
@@ -286,14 +283,13 @@ class Cambilight:
                     break
 
                 if self.context['debug']:
-                    cv2.imwrite("/tmp1/cam-test.png", img)
-                    debug_frame(img, 'out_o', self.context)
+                    debug_frame(img, 'original', self.context, unformatted_path='/tmp1/cam-test-{channel}.png')
 
-                demo = timed('ghetto_affine', ghetto_affine, img, self.context)
+                demo = timed('ghetto_affine', ghetto_affine, img, context=self.context)
 
-                removed = timed('ghetto_crop', ghetto_crop, demo, self.context)
+                removed = timed('ghetto_crop', ghetto_crop, demo, context=self.context)
 
-                removed = timed('ghetto_masks', ghetto_masks, removed, self.context)
+                removed = timed('ghetto_masks', ghetto_masks, removed, context=self.context)
 
                 # shrink = cv2.resize(removed, (self.context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
                 # shrink = cv2.resize(removed.row(0), (self.context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
@@ -310,7 +306,7 @@ class Cambilight:
                     print(lifx_hsv)
 
                 try:
-                    timed('set_zone_colors', bias.set_zone_colors, lifx_hsv, rapid=True)
+                    timed('set_zone_colors', bias.set_zone_colors, lifx_hsv, duration=500, rapid=True)
                 except Exception as e:
                     print(e)
                     traceback.print_exc()
@@ -321,7 +317,7 @@ class Cambilight:
                         (self.context['width'], self.context['height']),
                         interpolation=cv2.INTER_NEAREST
                     )
-                    debug_frame(final, 'out', self.context)
+                    debug_frame(final, 'final', self.context, unformatted_path='/tmp1/cam-test-{channel}.png')
 
                 if self.context['log_time']:
                     print(time.time() - start_time)
@@ -336,8 +332,8 @@ class Cambilight:
         cam.release()
 
         if self.context['debug']:
-            self.context['out'].release()
-            self.context['out_o'].release()
-            self.context['out_a'].release()
-            self.context['out_m'].release()
-            self.context['out_b'].release()
+            self.context['final'].release()
+            self.context['original'].release()
+            self.context['affine'].release()
+            self.context['masked'].release()
+            self.context['bars'].release()
