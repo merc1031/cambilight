@@ -52,7 +52,7 @@ def ret():
 
 
 @pytest.fixture()
-def basic_config():
+def basic_config(nrows, ncols):
     return {
         'top_left_factor': {
             'w': 0.29125,
@@ -81,11 +81,13 @@ def basic_config():
         'no_crop': False,
         'log_time': False,
         'test_file': None,
+        'width': ncols,
+        'height': nrows,
     }
 
 
 def describe_Cambilight():
-    def calls_read(basic_config, mock_lifxlan, mock_camera, mock_sleep):
+    def calls_external(basic_config, mock_lifxlan, mock_camera, mock_sleep):
         cam = cambilight.cambilight.Cambilight(basic_config)
         cam.stop = True
 
@@ -96,3 +98,20 @@ def describe_Cambilight():
         mock_camera.return_value.read.assert_called_once_with()
         mock_sleep.assert_called_once_with(.1)
         mock_camera.return_value.release.assert_called_once_with()
+
+    def describe_remove_bars():
+        def context_has_black_bars():
+            @pytest.fixture
+            def mk_pixel(ncols, nrows):
+                def m(x, y):
+                    if y < int(nrows * .20) or y > int(nrows * .80):
+                        return [0, 0, 0]
+                    else:
+                        return [255, 255, 255]
+                return m
+
+            def remove_bars(basic_config, mock_lifxlan, mock_camera, mock_sleep, data):
+                print(data)
+                res = cambilight.cambilight.ghetto_crop(data[1], basic_config)
+
+                assert res == data[1]

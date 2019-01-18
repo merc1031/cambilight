@@ -108,32 +108,39 @@ def ghetto_crop(img, context):
     if context['no_crop']:
         return img
 
+    # no_subs_l = int(.20 * context['width'])
+    # no_subs_r = int(.80 * context['width'])
+
+    # mask = np.zeros(context['width'], np.uint8)
+    # mask[np.r_[0:no_subs_l, no_subs_r:context['width']]] = 1
+
+    # start_of_safe = int(context['height'] * context['max_band_size'])
+    # end_of_safe = (int((1 - context['max_band_size']) * context['height']))
+
+    # average_row = np.average(img, axis=1)
+    # dev_row = np.std(img, axis=1)
+
+    # print("Average", average_row)
+    # print("Average high", average_row[0])
+    # print("Average mid", average_row[240])
+    # print("Average low", average_row[470])
+
+    # print("Dev", dev_row)
+    # print("Dev high", dev_row[0])
+    # print("Dev mid", dev_row[240])
+    # print("Dev low", dev_row[470])
+
+    # blackish_rows = (~(np.average(img, weights=mask, axis=1)[2] <= [20, 20, 20]).all(axis=1))
+
+    # blackish_rows[start_of_safe:end_of_safe] = True
+    # removed = img[blackish_rows]
+
     no_subs_l = int(.20 * context['width'])
     no_subs_r = int(.80 * context['width'])
-
     mask = np.zeros(context['width'], np.uint8)
     mask[np.r_[0:no_subs_l, no_subs_r:context['width']]] = 1
+    removed = img[~(np.average(img, weights=mask, axis=1) <= [20, 20, 20]).all(axis=1)]
 
-    start_of_safe = int(context['height'] * context['max_band_size'])
-    end_of_safe = (int((1 - context['max_band_size']) * context['height']))
-
-    average_row = np.average(img, axis=1)
-    dev_row = np.std(img, axis=1)
-
-    print("Average", average_row)
-    print("Average high", average_row[0])
-    print("Average mid", average_row[240])
-    print("Average low", average_row[470])
-
-    print("Dev", dev_row)
-    print("Dev high", dev_row[0])
-    print("Dev mid", dev_row[240])
-    print("Dev low", dev_row[470])
-
-    blackish_rows = (~(np.average(img, weights=mask, axis=1)[2] <= [20, 20, 20]).all(axis=1))
-
-    blackish_rows[start_of_safe:end_of_safe] = True
-    removed = img[blackish_rows]
     if context['debug']:
         print(removed.shape)
         debug_frame(removed, 'out_b', context)
