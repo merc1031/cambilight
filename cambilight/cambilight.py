@@ -158,146 +158,160 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
             'no_affine': no_affine,
             'no_crop': no_crop,
             'log_time': log_time,
+            'test_file': test_file,
         }
     }
 
-    stop = {'stop': False}
+    return Cambilight(context).inner_main()
 
-    def handler(signum, frame):
-        stop['stop'] = True
 
-    signal.signal(signal.SIGINT, handler)
+class Cambilight:
+    def __init__(self, context):
+        self.context = context
+        self.stop = False
 
-    print('Starting capture')
+    def inner_main(self):
 
-    if test_file:
-        class IM:
-            def read(self):
-                return True, cv2.imread(test_file)
+        def handler(signum, frame):
+            self.stop = True
 
-            def release(self):
-                pass
+        signal.signal(signal.SIGINT, handler)
 
-        cam = IM()
+        print('Starting capture')
 
-        context['width'] = 1920
-        context['height'] = 1080
-        context['width_float'] = 1920.0
-        context['height_float'] = 1080.0
-    else:
-        cam = cv2.VideoCapture(0)   # 0 -> index of camera
-        cam.set(3, context['camera']['w'])
-        cam.set(4, context['camera']['h'])
-        cam.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+        if self.context['test_file']:
+            class IM:
+                def read(self):
+                    return True, cv2.imread(self.context['test_file'])
 
-        context['width'] = int(cam.get(3))
-        context['height'] = int(cam.get(4))
-        context['width_float'] = cam.get(3)
-        context['height_float'] = cam.get(4)
+                def release(self):
+                    pass
 
-    fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+            cam = IM()
 
-    if context['debug']:
-        print(context['width'])
-        print(context['height'])
-        print(fourcc)
+            self.context['width'] = 1920
+            self.context['height'] = 1080
+            self.context['width_float'] = 1920.0
+            self.context['height_float'] = 1080.0
+        else:
+            cam = cv2.VideoCapture(0)   # 0 -> index of camera
+            cam.set(3, self.context['camera']['w'])
+            cam.set(4, self.context['camera']['h'])
+            cam.set(cv2.CAP_PROP_AUTOFOCUS, 0)
 
-        context['out_o'] = cv2.VideoWriter('/tmp1/cam-test-orig.avi', fourcc, 30, (context['width'], context['height']))
-        context['out_a'] = cv2.VideoWriter(
-            '/tmp1/cam-test-affine.avi',
-            fourcc,
-            30,
-            (context['width'], context['height'])
-        )
-        context['out_m'] = cv2.VideoWriter(
-            '/tmp1/cam-test-masked.avi',
-            fourcc,
-            30,
-            (context['width'], context['height'])
-        )
-        context['out_b'] = cv2.VideoWriter(
-            '/tmp1/cam-test-bars.avi',
-            fourcc,
-            30,
-            (context['width'], context['height'])
-        )
-        context['out'] = cv2.VideoWriter(
-            '/tmp1/cam-test.avi',
-            fourcc,
-            30,
-            (context['width'], context['height'])
-        )
+            self.context['width'] = int(cam.get(3))
+            self.context['height'] = int(cam.get(4))
+            self.context['width_float'] = cam.get(3)
+            self.context['height_float'] = cam.get(4)
 
-    lan = lifxlan.LifxLAN(26)
-    bias = lan.get_device_by_name('TV Bias')
-    bias.set_power(True)
+        fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
 
-    if context['debug']:
-        print(bias)
+        if self.context['debug']:
+            print(self.context['width'])
+            print(self.context['height'])
+            print(fourcc)
 
-    while True:
-        try:
-            start_time = time.time()
+            self.context['out_o'] = cv2.VideoWriter(
+                '/tmp1/cam-test-orig.avi',
+                fourcc,
+                30,
+                (self.context['width'], self.context['height'])
+            )
+            self.context['out_a'] = cv2.VideoWriter(
+                '/tmp1/cam-test-affine.avi',
+                fourcc,
+                30,
+                (self.context['width'], self.context['height'])
+            )
+            self.context['out_m'] = cv2.VideoWriter(
+                '/tmp1/cam-test-masked.avi',
+                fourcc,
+                30,
+                (self.context['width'], self.context['height'])
+            )
+            self.context['out_b'] = cv2.VideoWriter(
+                '/tmp1/cam-test-bars.avi',
+                fourcc,
+                30,
+                (self.context['width'], self.context['height'])
+            )
+            self.context['out'] = cv2.VideoWriter(
+                '/tmp1/cam-test.avi',
+                fourcc,
+                30,
+                (self.context['width'], self.context['height'])
+            )
 
-            read, img = cam.read()
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        lan = lifxlan.LifxLAN(26)
+        bias = lan.get_device_by_name('TV Bias')
+        bias.set_power(True)
 
-            if not read:
-                break
+        if self.context['debug']:
+            print(bias)
 
-            if context['debug']:
-                cv2.imwrite("/tmp1/cam-test.png", img)
-                debug_frame(img, 'out_o', context)
-
-            demo = timed('ghetto_affine', ghetto_affine, img, context)
-
-            removed = timed('ghetto_crop', ghetto_crop, demo, context)
-
-            removed = timed('ghetto_masks', ghetto_masks, removed, context)
-
-            # shrink = cv2.resize(removed, (context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
-            # shrink = cv2.resize(removed.row(0), (context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
-            shrink = removed[5, 10::(context['width'] // context['num_zones'] + 1)]
-            if context['debug']:
-                print(shrink)
-                print(shrink.shape)
-
-            # hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
-
-            lifx_hsv = [[h * 257, s * 257, v * 257, 3500] for [h, s, v] in shrink.tolist()]
-
-            if context['debug']:
-                print(lifx_hsv)
-
+        while True:
             try:
-                timed('set_zone_colors', bias.set_zone_colors, lifx_hsv, rapid=True)
+                start_time = time.time()
+
+                read, img = cam.read()
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+                if not read:
+                    break
+
+                if self.context['debug']:
+                    cv2.imwrite("/tmp1/cam-test.png", img)
+                    debug_frame(img, 'out_o', self.context)
+
+                demo = timed('ghetto_affine', ghetto_affine, img, self.context)
+
+                removed = timed('ghetto_crop', ghetto_crop, demo, self.context)
+
+                removed = timed('ghetto_masks', ghetto_masks, removed, self.context)
+
+                # shrink = cv2.resize(removed, (self.context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
+                # shrink = cv2.resize(removed.row(0), (self.context['num_zones'], 1), interpolation=cv2.INTER_NEAREST)
+                shrink = removed[5, 10::(self.context['width'] // self.context['num_zones'] + 1)]
+                if self.context['debug']:
+                    print(shrink)
+                    print(shrink.shape)
+
+                # hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
+
+                lifx_hsv = [[h * 257, s * 257, v * 257, 3500] for [h, s, v] in shrink.tolist()]
+
+                if self.context['debug']:
+                    print(lifx_hsv)
+
+                try:
+                    timed('set_zone_colors', bias.set_zone_colors, lifx_hsv, rapid=True)
+                except Exception as e:
+                    print(e)
+                    traceback.print_exc()
+
+                if self.context['debug']:
+                    final = cv2.resize(
+                        np.expand_dims(shrink, axis=0),
+                        (self.context['width'], self.context['height']),
+                        interpolation=cv2.INTER_NEAREST
+                    )
+                    debug_frame(final, 'out', self.context)
+
+                if self.context['log_time']:
+                    print(time.time() - start_time)
             except Exception as e:
                 print(e)
                 traceback.print_exc()
 
-            if context['debug']:
-                final = cv2.resize(
-                    np.expand_dims(shrink, axis=0),
-                    (context['width'], context['height']),
-                    interpolation=cv2.INTER_NEAREST
-                )
-                debug_frame(final, 'out', context)
+            time.sleep(.1)
+            if self.stop:
+                break
 
-            if context['log_time']:
-                print(time.time() - start_time)
-        except Exception as e:
-            print(e)
-            traceback.print_exc()
+        cam.release()
 
-        if stop['stop']:
-            break
-        time.sleep(.1)
-
-    cam.release()
-
-    if context['debug']:
-        context['out'].release()
-        context['out_o'].release()
-        context['out_a'].release()
-        context['out_m'].release()
-        context['out_b'].release()
+        if self.context['debug']:
+            self.context['out'].release()
+            self.context['out_o'].release()
+            self.context['out_a'].release()
+            self.context['out_m'].release()
+            self.context['out_b'].release()

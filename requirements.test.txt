@@ -1,0 +1,14 @@
+atomicwrites==1.2.1
+attrs==18.2.0
+flake8==3.6.0
+-e git+https://github.com/merc1031/lifxlan.git@563977f9ee8b83f340f552d9e67148fddfd13250#egg=lifxlan
+mccabe==0.6.1
+more-itertools==5.0.0
+pluggy==0.8.1
+py==1.7.0
+pycodestyle==2.4.0
+pyflakes==2.0.0
+pytest==4.0.2
+pytest-describe==0.11.1
+pytest-mock==1.10.0
+six==1.12.0
