@@ -99,6 +99,30 @@ def describe_Cambilight():
         # mock_sleep.assert_called_once_with(.1)
         mock_camera.return_value.release.assert_called_once_with()
 
+    def describe_cv_hsv_to_lifx_hsbk():
+        @pytest.fixture
+        def ncols():
+            return 10
+
+        @pytest.fixture
+        def nrows():
+            return 10
+
+        @pytest.fixture
+        def mk_pixel(ncols, nrows):
+            def m(x, y):
+                return [x * 18, 255, 0]
+            return m
+
+        def conversion(ncols, nrows, data):
+            stride = (18 * (1 / 180) * 256 * (256 + 1))
+            exp = np.array([
+                [[int(y * stride), 65535, 0, 3500] for y in range(ncols)]
+                for _ in range(nrows)])
+
+            res = cambilight.cambilight.cv_hsv_to_lifx_hsbk(data[1])
+            assert np.allclose(res, exp)
+
     def describe_remove_bars():
         def context_has_black_bars():
             @pytest.fixture
@@ -145,7 +169,7 @@ def describe_Cambilight():
             def mk_pixel(ncols, nrows):
                 def m(x, y):
                     if (y < int(nrows * .20) or y >= int(nrows * .80))\
-                        and (x < int(ncols * .25) or x > int(ncols * .75)):
+                            and (x < int(ncols * .25) or x > int(ncols * .75)):
                         return [0, 0, 0]
                     else:
                         return [255, 255, 255]
@@ -172,7 +196,7 @@ def describe_Cambilight():
             def mk_pixel(ncols, nrows):
                 def m(x, y):
                     if (y < int(nrows * .20) or y >= int(nrows * .80))\
-                        and (x < int(ncols * .25) or x > int(ncols * .75)):
+                            and (x < int(ncols * .25) or x > int(ncols * .75)):
                         return [0, 0, 0]
                     else:
                         if y == 5:

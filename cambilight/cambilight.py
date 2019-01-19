@@ -193,6 +193,24 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
     return Cambilight(context).inner_main()
 
 
+def cv_hsv_to_lifx_hsbk(hsv):
+    """
+    OpenCV HSV
+    H            S           V
+    0-179        0-255       0-255
+
+    LIFX HSBK
+    H            S           B          K
+    0-65535      0-65535     0-65535    2500-9000
+    """
+
+    hsbk = np.empty((hsv.shape[0], hsv.shape[1], hsv.shape[2] + 1), dtype=np.uint16)
+    hsbk[:, :, :3] = hsv
+    hsbk[:, :, 3] = 3500
+
+    return (hsbk * [(1 / 180) * 256 * (256 + 1), 256 + 1, 256 + 1, 1]).astype(dtype=np.uint16)
+
+
 class Cambilight:
     def __init__(self, context):
         self.context = context
