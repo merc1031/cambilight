@@ -346,6 +346,8 @@ class Cambilight:
                 # lifx_hsv = [[h * 257, s * 257, v * 257, 3500] for [h, s, v] in shrink.tolist()]
 
                 lifx_hsv = cv_hsv_to_lifx_hsbk(shrink)
+                if self.context['zone_order_reversed']:
+                    lifx_hsv = np.flip(lifx_hsv, axis=0)
 
                 print_d(self.context, 'hsv', lifx_hsv)
 
