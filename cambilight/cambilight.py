@@ -204,9 +204,10 @@ def cv_hsv_to_lifx_hsbk(hsv):
     0-65535      0-65535     0-65535    2500-9000
     """
 
-    hsbk = np.empty((hsv.shape[0], hsv.shape[1], hsv.shape[2] + 1), dtype=np.uint16)
-    hsbk[:, :, :3] = hsv
-    hsbk[:, :, 3] = 3500
+    new_shape = hsv.shape[:-1] + (hsv.shape[-1] + 1,)
+    hsbk = np.empty(new_shape, dtype=np.uint16)
+    hsbk[..., :3] = hsv
+    hsbk[..., 3] = 3500
 
     return (hsbk * [(1 / 180) * 256 * (256 + 1), 256 + 1, 256 + 1, 1]).astype(dtype=np.uint16)
 
@@ -342,7 +343,9 @@ class Cambilight:
 
                 # hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
 
-                lifx_hsv = [[h * 257, s * 257, v * 257, 3500] for [h, s, v] in shrink.tolist()]
+                # lifx_hsv = [[h * 257, s * 257, v * 257, 3500] for [h, s, v] in shrink.tolist()]
+
+                lifx_hsv = cv_hsv_to_lifx_hsbk(shrink)
 
                 print_d(self.context, 'hsv', lifx_hsv)
 
