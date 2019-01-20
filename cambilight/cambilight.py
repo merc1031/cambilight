@@ -32,6 +32,15 @@ def timed(t, fn, *args, **kwargs):
     return v
 
 
+def timed_drop(t, fn, *args, **kwargs):
+    start_time = time.time()
+    log_time = kwargs.pop('context', {}).get('log_time', False)
+    v = fn(*args, **kwargs)
+    if log_time:
+        print(t, time.time() - start_time)
+    return v
+
+
 
 def ghetto_affine(img, context):
     if context['no_affine']:
@@ -354,7 +363,7 @@ class Cambilight:
                 print_d(self.context, 'hsv', lifx_hsv)
 
                 try:
-                    timed('set_zone_colors', bias.set_zone_colors, lifx_hsv, duration=500, rapid=True)
+                    timed_drop('set_zone_colors', bias.set_zone_colors, lifx_hsv, duration=last_time, rapid=True, context=self.context)
                 except Exception as e:
                     print(e)
                     traceback.print_exc()
