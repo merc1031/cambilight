@@ -1,0 +1,7 @@
+version: '3'
+services:
+  cambilight:
+    build:
+      context: ./
+      dockerfile: container/Dockerfile
+    image: merc1031/cambilight:latest

@@ -1,9 +1,18 @@
+argh==0.26.2
+bitstring==3.1.5
 atomicwrites==1.2.1
 attrs==18.2.0
+click==6.7
 flake8==3.6.0
+Flask==0.12.2
+itsdangerous==0.24
+Jinja2==2.10
 -e git+https://github.com/merc1031/lifxlan.git@563977f9ee8b83f340f552d9e67148fddfd13250#egg=lifxlan
+MarkupSafe==1.0
 mccabe==0.6.1
 more-itertools==5.0.0
+numpy==1.13.3
+pathtools==0.1.2
 pluggy==0.8.1
 py==1.7.0
 pycodestyle==2.4.0
@@ -12,4 +21,7 @@ pytest==4.0.2
 pytest-describe==0.11.1
 pytest-mock==1.10.0
 pytest-watch==4.2.0
+PyYAML==3.13
 six==1.12.0
+watchdog==0.9.0
+Werkzeug==0.13
