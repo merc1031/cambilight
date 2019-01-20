@@ -173,9 +173,10 @@ def safe_zone(context):
 @click.option('--no-affine/--affine', default=False)
 @click.option('--no-crop/--crop', default=False)
 @click.option('--debug/--no-debug', default=False)
+@click.option('--lifx-debug/--no-lifx-debug', default=False)
 @click.option('--log-time/--no-log-time', default=False)
 @click.option('--config', type=click.Path())
-def main(test_file, no_affine, no_crop, debug, log_time, config):
+def main(test_file, no_affine, no_crop, debug, lifx_debug, log_time, config):
     with open(config) as fp:
         factors = json.load(fp)
 
@@ -187,6 +188,7 @@ def main(test_file, no_affine, no_crop, debug, log_time, config):
             'no_crop': no_crop,
             'log_time': log_time,
             'test_file': test_file,
+            'lifx_debug': lifx_debug,
         }
     }
 
@@ -290,7 +292,7 @@ class Cambilight:
                 (self.context['width'], self.context['height'])
             )
 
-        lan = lifxlan.LifxLAN(26)
+        lan = lifxlan.LifxLAN(26, verbose=self.context.get('lifx_debug', False))
         bias = lan.get_device_by_name('TV Bias')
         bias.set_power(True)
 
