@@ -304,8 +304,12 @@ class Cambilight:
         lan = lifxlan.LifxLAN(26, verbose=self.context.get('lifx_debug', False))
         bias = lan.get_device_by_name('TV Bias')
         bias.set_power(True)
+        if self.context['debug']:
+            color_zones = bias.get_color_zones()
 
-        print_d(self.context, 'bias light', bias)
+            print_d(self.context, 'bias light', bias)
+            print_d(self.context, 'bias light zones', color_zones)
+            print_d(self.context, 'bias light zone count', len(color_zones))
 
         while True:
             try:
