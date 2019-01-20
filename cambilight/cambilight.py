@@ -311,6 +311,7 @@ class Cambilight:
             print_d(self.context, 'bias light zones', color_zones)
             print_d(self.context, 'bias light zone count', len(color_zones))
 
+        last_time = 16
         while True:
             try:
                 start_time = time.time()
@@ -380,8 +381,9 @@ class Cambilight:
                     )
                     debug_frame(final, 'final', self.context, unformatted_path='/tmp1/cam-test-{channel}.png')
 
+                last_time = time.time() - start_time
                 if self.context['log_time']:
-                    print(time.time() - start_time)
+                    print('Full', last_time)
             except Exception as e:
                 print(e)
                 traceback.print_exc()
