@@ -3,6 +3,10 @@ import pytest
 
 import cambilight.cambilight
 
+@pytest.fixture(autouse=True)
+def mock_observer(mocker):
+    return mocker.patch('watchdog.observers.Observer')
+
 
 @pytest.fixture(autouse=True)
 def mock_lifxlan(mocker):
@@ -88,7 +92,7 @@ def basic_config(nrows, ncols):
 
 def describe_Cambilight():
     def calls_external(basic_config, mock_lifxlan, mock_camera, mock_sleep):
-        cam = cambilight.cambilight.Cambilight(basic_config)
+        cam = cambilight.cambilight.Cambilight(basic_config, 'config.json')
         cam.stop = True
 
         cam.inner_main()

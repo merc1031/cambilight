@@ -18,6 +18,7 @@
     "num_zones": 50,
     "zone_order_reversed": true,
     "max_band_size": 0.115,
+    "not_useful": 0.115,
     "camera": {
         "w": 480,
         "h": 270

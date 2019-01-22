@@ -1,4 +1,5 @@
 import json
+import os.path
 import time
 import signal
 import traceback
@@ -7,6 +8,17 @@ import click
 import cv2
 import lifxlan
 import numpy as np
+import watchdog.observers
+import watchdog.events
+
+
+class MyHandler(watchdog.events.PatternMatchingEventHandler):
+    def __init__(self, target, file):
+        super().__init__(patterns=[file])
+        self.target = target
+
+    def on_modified(self, event):
+        print(f'event type: {event.event_type}  path : {event.src_path}')
 
 
 def print_d(context, *args, **kwargs):
@@ -201,7 +213,7 @@ def main(test_file, no_affine, no_crop, debug, lifx_debug, log_time, config):
         }
     }
 
-    return Cambilight(context).inner_main()
+    return Cambilight(context, config).inner_main()
 
 
 def cv_hsv_to_lifx_hsbk(hsv):
@@ -224,11 +236,18 @@ def cv_hsv_to_lifx_hsbk(hsv):
 
 
 class Cambilight:
-    def __init__(self, context):
+    def __init__(self, context, file):
         self.context = context
         self.stop = False
+        self.json_file = file
 
     def inner_main(self):
+
+        print(os.path.dirname(self.json_file))
+        event_handler = MyHandler(self, self.json_file)
+        observer = watchdog.observers.Observer()
+        observer.schedule(event_handler, path=os.path.dirname(self.json_file), recursive=False)
+        observer.start()
 
         def handler(signum, frame):
             self.stop = True
@@ -391,6 +410,8 @@ class Cambilight:
             if self.stop:
                 break
 
+        observer.stop()
+        observer.join()
         cam.release()
 
         if self.context['debug']:
