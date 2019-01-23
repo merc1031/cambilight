@@ -6,47 +6,6 @@ import cambilight.cambilight
 
 
 def point_in_triangle(p, p0, p1, p2):
-    # Has weird line and misses the corners / lines
-    # area = 1/2 * (-p1[1] * p2[0] + p0[1] * (-p1[0] + p2[0]) + p0[0] * (p1[1] - p2[1]) + p1[0] * p2[1]);
-    # sign = -1 if area < 0 else 1;
-    # s = (p0[1] * p2[0] - p0[0] * p2[1] + (p2[1] - p0[1]) * p[0] + (p0[0] - p2[0]) * p[1]) * sign;
-    # t = (p0[0] * p1[1] - p0[1] * p1[0] + (p0[1] - p1[1]) * p[0] + (p1[0] - p0[0]) * p[1]) * sign;
-
-    # if any(map(lambda x: x < 0, [s,t])):
-    #     return False
-    # if any(map(lambda x: x == 0, [s,t])):
-    #     return True
-    # return s > 0 and t > 0 and (s + t) < 2 * area * sign;
-
-    # Has gross gaps all over. passes corners and lines
-    # def dot(l, r):
-    #     (x0, y0) = l
-    #     (x1, y1) = r
-    #     return x0 * x1 + y0 * y1
-
-    # ba = (p1[0] - p0[0], p1[1] - p0[1])
-    # ca = (p2[0] - p0[0], p2[1] - p0[1])
-    # pa = (p[0] - p0[0], p[1] - p0[1])
-
-    # d00 = dot(ba, ba)
-    # d01 = dot(ba, ca)
-    # d11 = dot(ca, ca)
-    # d20 = dot(pa, ba)
-    # d21 = dot(pa, ca)
-
-    # denom = d00 * d11 - d01 * d01
-
-    # v = (d11 * d20 - d01 * d21) / denom
-    # w = (d00 * d21 - d01 * d20) / denom
-    # u = 1.0 - v - w
-
-
-    # if any(map(lambda x: x < 0, [u, v, w])):
-    #     return False
-    # if any(map(lambda x: x == 0, [u, v, w])):
-    #     return True
-    # return u + v + w == 1
-
     def area(pp0, pp1, pp2):
         return ((pp0[0] * (pp1[1] - pp2[1]) + pp1[0] * (pp2[1] - pp0[1]) + pp2[0] * (pp0[1] - pp1[1]) ) / 2.0 )
 
@@ -332,14 +291,12 @@ def describe_Cambilight():
             return from_coord
 
         def remove_bars(affine_factors, mock_lifxlan, mock_camera, mock_sleep, data, colors):
-            # cv2.imwrite('/tmp1/test-data.png', data[1])
             res = cambilight.cambilight.ghetto_affine(data[1].astype(np.uint8), affine_factors)
-            # cv2.imwrite('/tmp1/test-data-affine.png', res)
 
             (tl, tr, bl, br) = cambilight.cambilight.to_corners(affine_factors)
             (tlc, trc, blc, brc) = tuple(map(lambda c: colors(c[0], c[1]), [tl, tr, bl, br])) 
-            assert res.shape == data[1].shape
 
+            assert res.shape == data[1].shape
             assert np.array_equal(res[0,0], tlc)
             assert np.array_equal(res[0,affine_factors['height'] - 1], trc)
             assert np.array_equal(res[affine_factors['width'] - 1,0], blc)

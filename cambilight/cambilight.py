@@ -74,20 +74,8 @@ def ghetto_affine(img, context):
 
     width = context['width']
     height = context['height']
-    # tl_factor = context['top_left_factor']
-    # tr_factor = context['top_right_factor']
-    # bl_factor = context['bottom_left_factor']
-    # br_factor = context['bottom_right_factor']
 
-    # tl = [int(width * tl_factor['w']),     int(height * tl_factor['h'])]
-    # tr = [int(width * tr_factor['w']),    int(height * tr_factor['h'])]
-    # bl = [int(width * bl_factor['w']),  int(height * bl_factor['h'])]
-    # br = [int(width * br_factor['w']), int(height * br_factor['h'])]
     (tl, tr, bl, br) = to_corners(context)
-    print(tl)
-    print(tr)
-    print(bl)
-    print(br)
 
     source_points = np.array([tl, tr, bl, br], dtype=np.float32)
     target_points = np.array(
