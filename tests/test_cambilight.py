@@ -106,6 +106,32 @@ def basic_config(nrows, ncols):
         'test_file': None,
         'width': ncols,
         'height': nrows,
+        "lights": [
+            {
+                "name": "TV Bias",
+                "geometries": [
+                    {
+                        "screen_space": {
+                            "top_left": {
+                                "x": 0.0,
+                                "y": 0.0
+                            },
+                            "bottom_right": {
+                                "x": 1.0,
+                                "y": 0.23
+                            }
+                        },
+                        "orientation": "LtR",
+                        "zone_order_reversed": True,
+                        "zones": {
+                            "start": 0,
+                            "end": 50
+                        },
+                        "resolution": 50
+                    }
+                ]
+            }
+        ]
     }
 
 

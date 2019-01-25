@@ -359,8 +359,8 @@ class Cambilight:
                 print_d(self.context, 'bias light', bias)
                 print_d(self.context, 'bias light zones', color_zones)
                 print_d(self.context, 'bias light zone count', len(color_zones))
+                l['color_zones'] = color_zones
             l['instance'] = bias
-            l['color_zones'] = color_zones
 
         last_time = 16
         while True:
