@@ -96,74 +96,96 @@ def ghetto_affine(img, context):
     return demo
 
 
-def ghetto_masks(img, context):
-    num_zones = context['num_zones']
-    max_band_size = context['max_band_size']
+def ghetto_masks(img_src, context):
+    '''
+    Context defines multiple lights
+    Each light defines some number of geometries
+    Each Geometry defines
+        The screen space (x,y) -> (x1, y1) rectangle it occupies
+        The orientation LtR, RtL, TtB, BtT
+        The range of zones n -> m of the light we will occupy
+        The resolution mapping of this leg to zones (2 means we only send 2 colors to the n->m zones range)
+    '''
+    shrinks = {}
+    for l in context['lights']:
+        img = np.copy(img_src)
+        shrinks[l['name']] = []
+        for g in l['geometries']:
+            save = {}
+            num_zones = g['resolution']
 
-    reg_height = int(context['height'] * (2 * max_band_size))
-    reg_width = int(context['width'] / num_zones)
+            start_y = int(context['height'] * g['screen_space']['top_left']['y'])
+            end_y = int(context['height'] * (
+                g['screen_space']['bottom_right']['y'] - g['screen_space']['top_left']['y']))
+            geom_height = end_y - start_y
+            reg_height = geom_height
 
-    if context['debug']:
-        print(reg_height, reg_width)
+            start_x = int(context['width'] * g['screen_space']['top_left']['x'])
+            end_x = int(context['width'] * (
+                g['screen_space']['bottom_right']['x'] - g['screen_space']['top_left']['x']))
+            geom_width = end_x - start_x
 
-    extra = context['width'] - (reg_width * num_zones)
-    first = int(extra / 2)
-    last = int(extra / 2)
+            reg_width = int(geom_width / num_zones)
 
-    for k in range(num_zones):
-        mask = np.zeros((context['height'], context['width'], 1), np.uint8)
+            if context['debug']:
+                print(reg_height, reg_width)
 
-        tl_ = (first + (reg_width * k), 0)
-        br_ = (first + (reg_width * (k + 1)), reg_height)
+            extra = geom_width - (reg_width * num_zones)
+            first = int(extra / 2)
+            last = int(extra / 2)
 
-        if k == 0:
-            mask[0:reg_height, 0:first] = 1
-            tl_ = (0, 0)
-            br_ = (first + reg_width, reg_height)
-        if k == num_zones - 1:
-            mask[0:reg_height, (first + (reg_width * k)):(first + last + (reg_width * (k + 1)))] = 1
-            br_ = (first + last + (reg_width * (k + 1)), reg_height)
-        mask[0:reg_height, first + (reg_width * k): first + (reg_width * (k + 1))] = 1
+            for k in range(num_zones):
+                mask = np.zeros((context['height'], context['width'], 1), np.uint8)
 
-        val_m = cv2.mean(img, mask=mask)
+                tl_ = (start_x + first + (reg_width * k), start_y)
+                br_ = (start_x + first + (reg_width * (k + 1)), reg_height)
 
-        cv2.rectangle(img, tl_, br_, color=val_m, thickness=-1)
+                if k == 0:
+                    mask[start_y:reg_height, start_x:start_x + first] = 1
+                    tl_ = (start_x, start_y)
+                    br_ = (first + reg_width, reg_height)
+                if k == num_zones - 1:
+                    mask[
+                        start_y:reg_height,
+                        (first + start_x + (reg_width * k)):(first + last + start_x + (reg_width * (k + 1)))] = 1
+                    br_ = (first + last + (reg_width * (k + 1)), reg_height)
+                mask[
+                    start_y:reg_height,
+                    first + start_x + (reg_width * k): first + start_x + (reg_width * (k + 1))] = 1
 
-    debug_frame(img, 'masked', context, unformatted_path='/tmp1/cam-test-{channel}.png')
+                val_m = cv2.mean(img, mask=mask)
 
-    return img
+                cv2.rectangle(img, tl_, br_, color=val_m, thickness=-1)
+
+            debug_frame(img, 'masked', context, unformatted_path='/tmp1/cam-test-{channel}.png')
+
+            center_one = start_x + (((first + reg_width) + (reg_width // 2)))
+            start = center_one - reg_width
+
+            end_gap = context['width'] - end_x
+            center_last = end_gap - (last + reg_width + (reg_width // 2))
+            end = center_last + reg_width
+
+            print_d(context, 'width', context['width'])
+            print_d(context, 'zones', context['num_zones'])
+            criteria = np.r_[
+                start,
+                center_one:
+                center_last:
+                reg_width,
+                end
+            ]
+            shrink = np.copy(img[5, criteria])
+            save['geom'] = g.copy()
+            save['shrink'] = shrink
+            shrinks[l['name']].append(save)
+
+    return shrinks
 
 
 def ghetto_crop(img, context):
     if context['no_crop']:
         return img
-
-    # no_subs_l = int(.20 * context['width'])
-    # no_subs_r = int(.80 * context['width'])
-
-    # mask = np.zeros(context['width'], np.uint8)
-    # mask[np.r_[0:no_subs_l, no_subs_r:context['width']]] = 1
-
-    # start_of_safe = int(context['height'] * context['max_band_size'])
-    # end_of_safe = (int((1 - context['max_band_size']) * context['height']))
-
-    # average_row = np.average(img, axis=1)
-    # dev_row = np.std(img, axis=1)
-
-    # print("Average", average_row)
-    # print("Average high", average_row[0])
-    # print("Average mid", average_row[240])
-    # print("Average low", average_row[470])
-
-    # print("Dev", dev_row)
-    # print("Dev high", dev_row[0])
-    # print("Dev mid", dev_row[240])
-    # print("Dev low", dev_row[470])
-
-    # blackish_rows = (~(np.average(img, weights=mask, axis=1)[2] <= [20, 20, 20]).all(axis=1))
-
-    # blackish_rows[start_of_safe:end_of_safe] = True
-    # removed = img[blackish_rows]
 
     # Only check outside to avoid subtitles
     no_subs_l = int(.20 * context['width'])
@@ -328,14 +350,17 @@ class Cambilight:
             )
 
         lan = lifxlan.LifxLAN(26, verbose=self.context.get('lifx_debug', False))
-        bias = lan.get_device_by_name('TV Bias')
-        bias.set_power(True)
-        if self.context['debug']:
-            color_zones = bias.get_color_zones()
+        for l in self.context['lights']:
+            bias = lan.get_device_by_name(l['name'])
+            bias.set_power(True)
+            if self.context['debug']:
+                color_zones = bias.get_color_zones()
 
-            print_d(self.context, 'bias light', bias)
-            print_d(self.context, 'bias light zones', color_zones)
-            print_d(self.context, 'bias light zone count', len(color_zones))
+                print_d(self.context, 'bias light', bias)
+                print_d(self.context, 'bias light zones', color_zones)
+                print_d(self.context, 'bias light zone count', len(color_zones))
+            l['instance'] = bias
+            l['color_zones'] = color_zones
 
         last_time = 16
         while True:
@@ -355,57 +380,47 @@ class Cambilight:
 
                 removed = timed('ghetto_crop', ghetto_crop, demo, context=self.context)
 
-                removed = timed('ghetto_masks', ghetto_masks, removed, context=self.context)
+                all_shrinks = timed('ghetto_masks', ghetto_masks, removed, context=self.context)
 
+                for l in self.context['lights']:
 
-                # This is wrong, adds too much when floating part is large....
-                gap = round(
-                    (
-                        (
-                            (self.context['width'] / self.context['num_zones']) - (self.context['width'] // self.context['num_zones'])
-                        ) *  self.context['num_zones']
-                    )
-                )
+                    shrinks = all_shrinks[l['name']]
+                    for i, shrink in enumerate(shrinks):
+                        app = False
+                        if i == len(shrinks) - 1:
+                            app = True
 
-                print_d(self.context, 'width', self.context['width'])
-                print_d(self.context, 'zones', self.context['num_zones'])
-                print_d(self.context, 'gap', gap)
-                criteria = np.r_[
-                    gap // 2,
-                    (gap // 2) + (self.context['width'] // self.context['num_zones'])\
-                    :\
-                    self.context['width']-((gap // 2) + (self.context['width'] // self.context['num_zones']))\
-                    :\
-                    self.context['width'] // self.context['num_zones'],
-                    self.context['width'] - (gap // 2)
-                ]
-                shrink = removed[5, criteria]
-                print_d(self.context, shrink)
-                print_d(self.context, shrink.shape)
+                        lifx_hsv = cv_hsv_to_lifx_hsbk(shrink['shrink'])
+                        if shrink['geom']['zone_order_reversed']:
+                            lifx_hsv = np.flip(lifx_hsv, axis=0)
 
-                # hsv = [colorsys.rgb_to_hsv(r / 255, g / 255, b / 255) for [b, g, r] in shrink.tolist()]
+                        print_d(self.context, 'hsv', lifx_hsv)
 
-                # lifx_hsv = [[h * 257, s * 257, v * 257, 3500] for [h, s, v] in shrink.tolist()]
+                        actual_num_zones = shrink['geom']['zones']['end'] - shrink['geom']['zones']['start']
+                        gap = actual_num_zones // shrink['geom']['resolution']
+                        try:
+                            for (i, color) in enumerate(lifx_hsv):
+                                timed_drop(
+                                    'set_zone_colors',
+                                    l['instance'].set_zone_color,
+                                    i,
+                                    i + gap,
+                                    color,
+                                    duration=last_time,
+                                    rapid=True,
+                                    apply=app,
+                                    context=self.context)
+                        except Exception as e:
+                            print(e)
+                            traceback.print_exc()
 
-                lifx_hsv = cv_hsv_to_lifx_hsbk(shrink)
-                if self.context['zone_order_reversed']:
-                    lifx_hsv = np.flip(lifx_hsv, axis=0)
-
-                print_d(self.context, 'hsv', lifx_hsv)
-
-                try:
-                    timed_drop('set_zone_colors', bias.set_zone_colors, lifx_hsv, duration=last_time, rapid=True, context=self.context)
-                except Exception as e:
-                    print(e)
-                    traceback.print_exc()
-
-                if self.context['debug']:
-                    final = cv2.resize(
-                        np.expand_dims(shrink, axis=0),
-                        (self.context['width'], self.context['height']),
-                        interpolation=cv2.INTER_NEAREST
-                    )
-                    debug_frame(final, 'final', self.context, unformatted_path='/tmp1/cam-test-{channel}.png')
+                        if self.context['debug']:
+                            final = cv2.resize(
+                                np.expand_dims(shrink, axis=0),
+                                (self.context['width'], self.context['height']),
+                                interpolation=cv2.INTER_NEAREST
+                            )
+                            debug_frame(final, 'final', self.context, unformatted_path='/tmp1/cam-test-{channel}.png')
 
                 last_time = time.time() - start_time
                 if self.context['log_time']:
